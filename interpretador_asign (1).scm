@@ -69,7 +69,12 @@
 (define grammar-simple-interpreter
   '((program (expression) a-program)
     (expression (number) lit-exp)
-    (expression (identifier) var-exp)
+
+    ;; Expresiones Definiciones
+    (expression ("var" (separated-list identifier "=" expression ",") "in" expression) var-exp)
+    (expression ("const" (separated-list identifier "=" expression ",") "in" expression) const-exp)
+    ;(expression ("rec" identifier "(" (arbno (separated-list identifier ","))  expression "in" expression) rec-exp)
+                
     (expression
      (primitive "(" (separated-list expression ",")")")
      primapp-exp)
@@ -84,7 +89,10 @@
     (expression ("letrec" (arbno identifier "(" (separated-list identifier ",") ")" "=" expression)  "in" expression) 
                 letrec-exp)
 
-        (expression (circuit) circuit-exp)
+    (expression (circuit) circuit-exp)
+
+
+    ;; Definiciones
 
     ;; Circuit
     (circuit ("circuit" "(gate_list" gate_list ")") a-circuit)
@@ -249,7 +257,11 @@
   (lambda (exp env)
     (cases expression exp
       (lit-exp (datum) datum)
-      (var-exp (id) (apply-env env id))
+      ;(var-exp (id) (apply-env env id))
+      (var-exp (id expVal varBody) (list id expVal varBody))
+      (const-exp (id expVal constBody) (list id expVal constBody))
+      ;(rec-exp (id param recBody) 'implementar)
+      
       (primapp-exp (prim rands)
                    (let ((args (eval-rands rands env)))
                      (apply-primitive prim args)))
@@ -794,6 +806,7 @@ eval-circuit(connected)
 ;******************************************************************************************
 ;Pruebas
 
+#|
 (show-the-datatypes)
 just-scan
 scan&parse
@@ -828,5 +841,6 @@ add1(x)")
                                                  (lit-exp 200))))
 (define un-programa-dificil
     (a-program una-expresion-dificil))
+|#
 
 (interpretador)
