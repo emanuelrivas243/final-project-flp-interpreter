@@ -10,6 +10,8 @@
 ;;                      <a-program (exp)>
 ;;  <expression>    ::= <number>
 ;;                      <lit-exp (datum)>
+;;                  ::= <string>
+;;                  ::= 
 ;;                  ::= <identifier>
 ;;                      <var-exp (id)>
 ;;                  ::= <primitive> ({<expression>}*(,))
@@ -28,6 +30,18 @@
 ;;                     <begin-exp (exp exps)>
 ;;                  ::= set <identifier> = <expression>
 ;;                     <set-exp (id rhsexp)>
+;;                  ::= var {<identifier> = <expression>}*(,) in <expression>
+;;                      <var-exp (id expVal varBody)>
+;;                  ::= const {<identifier> = <expression>}*(,) in <expression>
+;;                      <const-exp (id expConst constBody)>
+;;                  ::= rec {<identifier> ( {<identifier>} *(,) ) = <expression>}* in <expression>
+;;                      <rec-exp (id param expRec recBody)>
+;;                  ::= <cadena>
+;;                      (a-string <identifier>)
+;;                  ::= <bool>
+;;                      (true-exp ())
+;;                      (false-exp ())
+
 
 ;;  <circuit>       ::= <gate_list>
 ;;
@@ -68,13 +82,40 @@
 
 (define grammar-simple-interpreter
   '((program (expression) a-program)
+    
+    ;; Datos
     (expression (number) lit-exp)
+    (expression (identifier) a-string)
+    (expression ("true") true-exp)
+    (expression ("false") false-exp)
 
     ;; Expresiones Definiciones
     (expression ("var" (separated-list identifier "=" expression ",") "in" expression) var-exp)
     (expression ("const" (separated-list identifier "=" expression ",") "in" expression) const-exp)
     ;(expression ("rec" identifier "(" (arbno (separated-list identifier ","))  expression "in" expression) rec-exp)
-                
+
+    ;; Constructores de Datos Predefinidos
+    (expression ("lista" "(" (separated-list expression ";") ")") list-exp)
+    (expression ("lista()") emptylist-exp)
+    (expression ("tupla" "[" (separated-list expression ";") "]") tuple-exp)
+    (expression ("tupla[]") emptytuple-exp)
+    (expression
+     (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
+    (pred-prim ("<") less-pred-prim)
+    (pred-prim (">") greater-pred-prim)
+    (pred-prim ("<=") less-equal-pred-prim)
+    (pred-prim (">=") greater-equal-pred-prim)
+    (pred-prim ("==") equal-pred-prim)
+    (pred-prim ("<>") not-equal-pred-prim)
+    (expression
+     (oper-bin-bool "(" expression "," expression ")") bool-binop-exp)
+    (expression
+     (oper-un-bool "(" expression ")") bool-uniop-exp)
+    (oper-bin-bool ("and") and-op-bool)
+    (oper-bin-bool ("or") or-op-bool)
+    (oper-un-bool ("not") not-op-bool)
+
+    ;; 
     (expression
      (primitive "(" (separated-list expression ",")")")
      primapp-exp)
@@ -257,10 +298,19 @@
   (lambda (exp env)
     (cases expression exp
       (lit-exp (datum) datum)
+      (a-string (str) str)
+      (true-exp () #t)
+      (false-exp () #f)
+      
       ;(var-exp (id) (apply-env env id))
       (var-exp (id expVal varBody) (list id expVal varBody))
       (const-exp (id expVal constBody) (list id expVal constBody))
       ;(rec-exp (id param recBody) 'implementar)
+      (list-exp (elements) (list (eval-expression (car (cdr elements)) env)))
+      (emptylist-exp () (list))
+
+      (tuple-exp (elements) (values elements))
+      (emptytuple-exp () (values))
       
       (primapp-exp (prim rands)
                    (let ((args (eval-rands rands env)))
@@ -843,4 +893,4 @@ add1(x)")
     (a-program una-expresion-dificil))
 |#
 
-(interpretador)
+;(interpretador)
