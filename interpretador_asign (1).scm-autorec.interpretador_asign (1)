@@ -90,8 +90,6 @@
 
     ;; Expresiones Definiciones
     (expression ("var" (separated-list identifier "=" expression ",") "in" expression ";") vardecl-exp)
-    (expression ("rec" (arbno identifier "(" (separated-list identifier ",") ")" "=" expression) "in" expression) 
-                letrec-exp)
     ;(expression ("const" (separated-list identifier "=" expression ",") "in" expression) const-exp)
     ;(expression ("rec" identifier "(" (arbno (separated-list identifier ","))  expression "in" expression) rec-exp)
 
@@ -131,7 +129,8 @@
                 proc-exp)
     (expression ( "(" expression (arbno expression) ")")
                 app-exp)
-
+    (expression ("rec" (arbno identifier "(" (separated-list identifier ",") ")" "=" expression)  "in" expression) 
+                letrec-exp)
 
     ; características adicionales
     (expression ("begin" expression (arbno ";" expression) "end")
@@ -581,15 +580,11 @@ como true o false directamente.
 
 ;true-value?: determina si un valor dado corresponde a un valor booleano falso o verdadero
 (define true-value?
-  (lambda (x)
-    (not (zero? x))))
-
-;(define true-value?
- ; (lambda (v)
-  ;  (cond
-   ;   ((= v 1) #t)
-    ;  ((= v -1) #f)
-     ; (else #t))))
+  (lambda (v)
+    (cond
+      ((= v 1) #t)
+      ((= v -1) #f)
+      (else #t))))
 
 
 
