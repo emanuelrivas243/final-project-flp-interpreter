@@ -73,16 +73,20 @@
    ("%" (arbno (not #\newline))) skip)
   (identifier
    (letter (arbno (or letter digit "?"))) symbol)
-  (number
+  (numberInt
    (digit (arbno digit)) number)
-  (number
-   ("-" digit (arbno digit)) number)))
+  (numberInt
+   ("-" digit (arbno digit)) number)
+  (numberFloat
+   (digit (arbno digit) "." digit (arbno digit)) number)
+  (numberFloat
+   ("-" digit (arbno digit) "." digit (arbno digit)) number)))
 
 ;Especificación Sintáctica (gramática)
 
 (define grammar-simple-interpreter
   '((program (expression) a-program)
-    (expression (number) lit-exp)
+    (expression (numberInt) int-exp)
     ;(expression (identifier) a-string)
     (expression ("true") true-exp)
     (expression ("false") false-exp)
@@ -95,29 +99,29 @@
     ;(expression ("const" (separated-list identifier "=" expression ",") "in" expression) const-exp)
     ;(expression ("rec" identifier "(" (arbno (separated-list identifier ","))  expression "in" expression) rec-exp)
 
-    #|
+    
     ;; Constructores de Datos Predefinidos
-    (expression ("lista" "(" (separated-list expression ";") ")") list-exp)
+    (expression ("lista" "(" (separated-list expression ",") ")") list-exp)
     (expression ("lista()") emptylist-exp)
-    (expression ("tupla" "[" (separated-list expression ",") "]") tuple-exp)
-    (expression ("tupla[]") emptytuple-exp)
-    (expression
-     (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
-    (pred-prim ("<") less-pred-prim)
-    (pred-prim (">") greater-pred-prim)
-    (pred-prim ("<=") less-equal-pred-prim)
-    (pred-prim (">=") greater-equal-pred-prim)
-    (pred-prim ("==") equal-pred-prim)
-    (pred-prim ("!=") not-equal-pred-prim)
-    (expression
-     (oper-bin-bool "(" expression "," expression ")") bool-binop-exp)
-    (expression
-     (oper-un-bool "(" expression ")") bool-uniop-exp)
-    (oper-bin-bool ("and") and-op-bool)
-    (oper-bin-bool ("or") or-op-bool)
-    (oper-un-bool ("not") not-op-bool)
+    ;(expression ("tupla" "[" (separated-list expression ",") "]") tuple-exp)
+    ;(expression ("tupla[]") emptytuple-exp)
+    ;(expression
+    ; (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
+    ;(pred-prim ("<") less-pred-prim)
+    ;(pred-prim (">") greater-pred-prim)
+    ;(pred-prim ("<=") less-equal-pred-prim)
+    ;(pred-prim (">=") greater-equal-pred-prim)
+    ;(pred-prim ("==") equal-pred-prim)
+    ;(pred-prim ("!=") not-equal-pred-prim)
+    ;(expression
+    ; (oper-bin-bool "(" expression "," expression ")") bool-binop-exp)
+    ;(expression
+    ; (oper-un-bool "(" expression ")") bool-uniop-exp)
+    ;(oper-bin-bool ("and") and-op-bool)
+    ;(oper-bin-bool ("or") or-op-bool)
+    ;(oper-un-bool ("not") not-op-bool)
 
-    |#
+    
     
     ;; 
     (expression
@@ -300,7 +304,7 @@
 (define eval-expression
   (lambda (exp env)
     (cases expression exp
-      (lit-exp (datum) datum)
+      (int-exp (datum) datum)
       ;(a-string (str) str)
       (true-exp () #t)
       (false-exp () #f)
@@ -312,8 +316,9 @@
                                       (extend-env ids args env))))
       ;(const-exp (id expVal constBody) (list id expVal constBody))
       ;(rec-exp (id param recBody) 'implementar)
-      ;(list-exp (elements) (list (eval-expression (car (cdr elements)) env)))
-      ;(emptylist-exp () (list))
+      (list-exp (elements) (cons (eval-expression (car elements) env)
+                                 (eval-rands (cdr elements) env)))
+      (emptylist-exp () (list))
 
       ;(tuple-exp (elements) (values elements))
       ;(emptytuple-exp () (values))
@@ -349,13 +354,13 @@
                  1))
       (begin-exp (exp exps) 
                  (let loop ((acc (eval-expression exp env))
-                             (exps exps))
-                    (if (null? exps) 
-                        acc
-                        (loop (eval-expression (car exps) 
-                                               env)
-                              (cdr exps)))))
-       (circuit-exp (circ) (eval-circuit circ env)))))
+                            (exps exps))
+                   (if (null? exps) 
+                       acc
+                       (loop (eval-expression (car exps) 
+                                              env)
+                             (cdr exps)))))
+      (circuit-exp (circ) (eval-circuit circ env)))))
 
 ; funciones auxiliares para aplicar eval-expression a cada elemento de una 
 ; lista de operandos (expresiones)
@@ -874,7 +879,19 @@ eval-circuit(connected)
 x = 1, 
 y = 2 in 
 +(x,y);
+
+
+var x = lista(1,2,3) 
+in x;
+(1 2 3)
+
+var x = lista() in x;
+()
+
+
 |#
+
+
 
 #|
 (show-the-datatypes)
@@ -913,4 +930,4 @@ add1(x)")
     (a-program una-expresion-dificil))
 |#
 
-;(interpretador)
+(interpretador)
