@@ -111,6 +111,9 @@
     
     (expression
      (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
+
+    (expression
+     (oper-bin-bool "(" expression "," expression ")") bool-binop-exp)
     
     (pred-prim ("<") less-pred-prim)
     (pred-prim (">") greater-pred-prim)
@@ -122,8 +125,8 @@
     ; (oper-bin-bool "(" expression "," expression ")") bool-binop-exp)
     ;(expression
     ; (oper-un-bool "(" expression ")") bool-uniop-exp)
-    ;(oper-bin-bool ("and") and-op-bool)
-    ;(oper-bin-bool ("or") or-op-bool)
+    (oper-bin-bool ("and") and-op-bool)
+    (oper-bin-bool ("or") or-op-bool)
     ;(oper-un-bool ("not") not-op-bool)
 
     ;; Primitivas sobre listas -> Crear un eval-list para este caso, ya que es un nuevo datatype
@@ -385,6 +388,9 @@
       ;; Expresiones booleanas
       (comparison-prim-exp (pred exp1 exp2)
                            (eval-expr-bool pred (list (eval-rand exp1 env) (eval-rand exp2 env))))
+
+      (bool-binop-exp (binop expr-bool1 expr-bool2)
+                      (eval-expr-bool-binop binop (list (eval-rand expr-bool1 env) (eval-rand expr-bool2 env))))
       
       (circuit-exp (circ) (eval-circuit circ env)))))
 
@@ -783,6 +789,14 @@ eval-circuit(connected)
       (not-equal-pred-prim () (not (= (car args) (cadr args))))
       )))
 
+;; eval-expr-bool-binop
+(define eval-expr-bool-binop
+  (lambda (binop args)
+    (cases oper-bin-bool binop
+      (and-op-bool () (and (car args) (cadr args)))
+      (or-op-bool () (or (car args) (cadr args)))
+      )))
+
 ;*******************************************************************************************
 ;Procedimientos
 (define-datatype procval procval?
@@ -990,6 +1004,16 @@ end
 
 !=(2,0)
 #t
+
+and( <(5,3) , >(8,4) )
+
+
+--> and( <(5,3) , >(8,4) )
+#f
+--> or( <(5,3) , >(8,4) )
+#t
+
+
 
 
 |#
