@@ -133,7 +133,7 @@
     (primitive-list ("lista?") lista?-prim-list)
     (primitive-list ("cabeza") cabeza-prim-list)
     (primitive-list ("cola") cola-prim-list)
-    ;(primitive-list ("append") append-prim-list)
+    (primitive-list ("append") append-prim-list)
     ;(primitive-list ("ref-list") ref-list-prim)
     ;(primitive-list ("set-list") set-list-prim)
     
@@ -752,9 +752,15 @@ eval-circuit(connected)
       (vacio?-prim-list () (null? (car args)))
       (lista?-prim-list () (list? (car args)))
       (cabeza-prim-list () (caar args))
-      (cola-prim-list () (cdr (car args))))))
+      (cola-prim-list () (cdr (car args)))
+      (append-prim-list () (append-aux args)))))
 
-
+; Función auxiliar para recorrer la lista de listas y hacerles append
+(define append-aux
+  (lambda (args)
+    (if (null? args)
+        '()
+        (append (car args) (append-aux (cdr args))))))
 
 
 ;*******************************************************************************************
@@ -927,6 +933,8 @@ lista?(lista(1,2,3)) -> #t
 
 cabeza(lista(1,2,3)) -> 1
 
+
+append(lista(1,2,3) lista(5,6)) -> (1 2 3 5 6)
 
 |#
 
