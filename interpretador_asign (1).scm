@@ -103,6 +103,8 @@
     ;; Constructores de Datos Predefinidos
     (expression ("lista" "(" (separated-list expression ",") ")") list-exp)
     (expression ("lista()") emptylist-exp)
+    (expression (primitive-list "(" (arbno expression) ")") prim-list-exp)
+    
     ;(expression ("tupla" "[" (separated-list expression ",") "]") tuple-exp)
     ;(expression ("tupla[]") emptytuple-exp)
     ;(expression
@@ -121,18 +123,35 @@
     ;(oper-bin-bool ("or") or-op-bool)
     ;(oper-un-bool ("not") not-op-bool)
 
+    ;; Primitivas sobre listas -> Crear un eval-list para este caso, ya que es un nuevo datatype
+    ;; ejemplo: vacio?(lista(1,2,3)) -> #f ;|; vacio?(lista()) -> #t
+    
+    (primitive-list ("vacio?") vacio?-prim-list)
+    ;(primitive-list ("vacio") vacio-prim-list)
+    ;(primitive-list ("crear-lista") crear-prim-list)
+    
+    (primitive-list ("lista?") lista?-prim-list)
+    (primitive-list ("cabeza") cabeza-prim-list)
+    (primitive-list ("cola") cola-prim-list)
+    ;(primitive-list ("append") append-prim-list)
+    ;(primitive-list ("ref-list") ref-list-prim)
+    ;(primitive-list ("set-list") set-list-prim)
     
     
     ;; 
     (expression
      (primitive "(" (separated-list expression ",")")")
      primapp-exp)
+    
     (expression ("if" expression "then" expression "else" expression)
                 if-exp)
+    
     (expression ("let" (arbno identifier "=" expression) "in" expression)
                 let-exp)
+    
     (expression ("proc" "(" (arbno identifier) ")" expression)
                 proc-exp)
+    
     (expression ( "(" expression (arbno expression) ")")
                 app-exp)
 
@@ -319,6 +338,7 @@
       (list-exp (elements) (cons (eval-expression (car elements) env)
                                  (eval-rands (cdr elements) env)))
       (emptylist-exp () (list))
+      (prim-list-exp (prim lst) (eval-list-prim prim (eval-rands lst env)))
 
       ;(tuple-exp (elements) (values elements))
       ;(emptytuple-exp () (values))
@@ -725,6 +745,17 @@ eval-circuit(connected)
 |#
 
 
+;; eval-list-prim
+(define eval-list-prim
+  (lambda (prim args)
+    (cases primitive-list prim
+      (vacio?-prim-list () (null? (car args)))
+      (lista?-prim-list () (list? (car args)))
+      (cabeza-prim-list () (caar args))
+      (cola-prim-list () (cdr (car args))))))
+
+
+
 
 ;*******************************************************************************************
 ;Procedimientos
@@ -887,6 +918,14 @@ in x;
 
 var x = lista() in x;
 ()
+
+
+lista?
+lista?(lista()) -> #t
+lista?(lista(1,2,3)) -> #t
+
+
+cabeza(lista(1,2,3)) -> 1
 
 
 |#
