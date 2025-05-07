@@ -105,16 +105,19 @@
     (expression ("lista()") emptylist-exp)
     (expression (primitive-list "(" (arbno expression) ")") prim-list-exp)
     
-    ;(expression ("tupla" "[" (separated-list expression ",") "]") tuple-exp)
+    (expression ("tupla" "(" (separated-list expression ",") ")") tuple-exp)
+    
     ;(expression ("tupla[]") emptytuple-exp)
-    ;(expression
-    ; (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
-    ;(pred-prim ("<") less-pred-prim)
-    ;(pred-prim (">") greater-pred-prim)
-    ;(pred-prim ("<=") less-equal-pred-prim)
-    ;(pred-prim (">=") greater-equal-pred-prim)
-    ;(pred-prim ("==") equal-pred-prim)
-    ;(pred-prim ("!=") not-equal-pred-prim)
+    
+    (expression
+     (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
+    
+    (pred-prim ("<") less-pred-prim)
+    (pred-prim (">") greater-pred-prim)
+    (pred-prim ("<=") less-equal-pred-prim)
+    (pred-prim (">=") greater-equal-pred-prim)
+    (pred-prim ("==") equal-pred-prim)
+    (pred-prim ("!=") not-equal-pred-prim)
     ;(expression
     ; (oper-bin-bool "(" expression "," expression ")") bool-binop-exp)
     ;(expression
@@ -134,7 +137,7 @@
     (primitive-list ("cabeza") cabeza-prim-list)
     (primitive-list ("cola") cola-prim-list)
     (primitive-list ("append") append-prim-list)
-    ;(primitive-list ("ref-list") ref-list-prim)
+    (primitive-list ("ref-list") ref-list-prim)
     ;(primitive-list ("set-list") set-list-prim)
     
     
@@ -334,13 +337,11 @@
                      (eval-expression varBody
                                       (extend-env ids args env))))
       ;(const-exp (id expVal constBody) (list id expVal constBody))
-      ;(rec-exp (id param recBody) 'implementar)
-      (list-exp (elements) (cons (eval-expression (car elements) env)
-                                 (eval-rands (cdr elements) env)))
+      (list-exp (elements) (eval-rands elements env))
       (emptylist-exp () (list))
-      (prim-list-exp (prim lst) (eval-list-prim prim (eval-rands lst env)))
+      (prim-list-exp (prim lst) (eval-list-prim prim (eval-rands lst env) env))
 
-      ;(tuple-exp (elements) (values elements))
+      (tuple-exp (elements) 'porimplementar)
       ;(emptytuple-exp () (values))
       
       (primapp-exp (prim rands)
@@ -380,6 +381,11 @@
                        (loop (eval-expression (car exps) 
                                               env)
                              (cdr exps)))))
+
+      ;; Expresiones booleanas
+      (comparison-prim-exp (pred exp1 exp2)
+                           (eval-expr-bool pred (list (eval-rand exp1 env) (eval-rand exp2 env))))
+      
       (circuit-exp (circ) (eval-circuit circ env)))))
 
 ; funciones auxiliares para aplicar eval-expression a cada elemento de una 
@@ -747,13 +753,16 @@ eval-circuit(connected)
 
 ;; eval-list-prim
 (define eval-list-prim
-  (lambda (prim args)
+  (lambda (prim args env)
     (cases primitive-list prim
       (vacio?-prim-list () (null? (car args)))
       (lista?-prim-list () (list? (car args)))
       (cabeza-prim-list () (caar args))
       (cola-prim-list () (cdr (car args)))
-      (append-prim-list () (append-aux args)))))
+      (append-prim-list () (append-aux args))
+      (ref-list-prim () env)
+      
+      )))
 
 ; Función auxiliar para recorrer la lista de listas y hacerles append
 (define append-aux
@@ -762,6 +771,17 @@ eval-circuit(connected)
         '()
         (append (car args) (append-aux (cdr args))))))
 
+;; eval-expr-bool
+(define eval-expr-bool
+  (lambda (pred args)
+    (cases pred-prim pred
+      (less-pred-prim () (< (car args) (cadr args)))
+      (greater-pred-prim () (> (car args) (cadr args)))
+      (less-equal-pred-prim () (<= (car args) (cadr args)))
+      (greater-equal-pred-prim () (>= (car args) (cadr args)))
+      (equal-pred-prim () (= (car args) (cadr args)))
+      (not-equal-pred-prim () (not (= (car args) (cadr args))))
+      )))
 
 ;*******************************************************************************************
 ;Procedimientos
@@ -935,6 +955,42 @@ cabeza(lista(1,2,3)) -> 1
 
 
 append(lista(1,2,3) lista(5,6)) -> (1 2 3 5 6)
+
+
+var x = lista(1,2,3) in 
+begin 
+set x = lista(4,3); 
+x 
+end 
+;
+(4 3) -> Preguntar sobre esta parte, si es redundante ref-list y set-list ya que eso ya existe
+
+
+<(5,3)
+#f
+
+>(5,3)
+#t
+
+>=(5,3)
+#t
+
+
+<=(5,3)
+#f
+
+<=(0,0)
+#t
+
+ <=(2,0)
+#f
+
+==(24,3)
+#f
+
+!=(2,0)
+#t
+
 
 |#
 
