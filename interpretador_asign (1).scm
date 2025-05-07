@@ -121,13 +121,13 @@
     (pred-prim (">=") greater-equal-pred-prim)
     (pred-prim ("==") equal-pred-prim)
     (pred-prim ("!=") not-equal-pred-prim)
-    ;(expression
-    ; (oper-bin-bool "(" expression "," expression ")") bool-binop-exp)
-    ;(expression
-    ; (oper-un-bool "(" expression ")") bool-uniop-exp)
+    
+    (expression
+     (oper-un-bool "(" expression ")") bool-uniop-exp)
+    
     (oper-bin-bool ("and") and-op-bool)
     (oper-bin-bool ("or") or-op-bool)
-    ;(oper-un-bool ("not") not-op-bool)
+    (oper-un-bool ("not") not-op-bool)
 
     ;; Primitivas sobre listas -> Crear un eval-list para este caso, ya que es un nuevo datatype
     ;; ejemplo: vacio?(lista(1,2,3)) -> #f ;|; vacio?(lista()) -> #t
@@ -391,6 +391,8 @@
 
       (bool-binop-exp (binop expr-bool1 expr-bool2)
                       (eval-expr-bool-binop binop (list (eval-rand expr-bool1 env) (eval-rand expr-bool2 env))))
+
+      (bool-uniop-exp (uniop expr-bool) (eval-expr-bool-uniop uniop (eval-rand expr-bool env)))
       
       (circuit-exp (circ) (eval-circuit circ env)))))
 
@@ -797,6 +799,12 @@ eval-circuit(connected)
       (or-op-bool () (or (car args) (cadr args)))
       )))
 
+(define eval-expr-bool-uniop
+  (lambda (uniop args)
+    (cases oper-un-bool uniop
+      (not-op-bool () (not args))
+      )))
+
 ;*******************************************************************************************
 ;Procedimientos
 (define-datatype procval procval?
@@ -1014,6 +1022,7 @@ and( <(5,3) , >(8,4) )
 #t
 
 
+not( <(4,3) ) -> #t
 
 
 |#
