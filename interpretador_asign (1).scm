@@ -1,4 +1,5 @@
 #lang eopl
+(require racket/list)
 
 ;******************************************************************************************
 ;;;;; Interpretador para lenguaje con condicionales, ligadura local, procedimientos,
@@ -140,8 +141,8 @@
     (primitive-list ("cabeza") cabeza-prim-list)
     (primitive-list ("cola") cola-prim-list)
     (primitive-list ("append") append-prim-list)
-    (primitive-list ("ref-list") ref-list-prim)
-    ;(primitive-list ("set-list") set-list-prim)
+    ;(primitive-list ("ref-list") ref-list-prim)
+    (primitive-list ("set-list") set-list-prim)
     
     
     ;; 
@@ -314,6 +315,7 @@
     (extend-env
      '(i v x)
      '(1 5 10)
+     '(const const var)
      (empty-env))))
 
 ;(define init-env
@@ -337,12 +339,13 @@
       (var-exp (id) (apply-env env id))
       (vardecl-exp (ids expVar varBody)
                    (let ((args (eval-rands expVar env)))
-                     (eval-expression varBody
-                                      (extend-env ids args env))))
+                     (let ((tags (repeat-var-tags (length ids))))
+                       (eval-expression varBody (extend-env ids args tags env)))))
+
       ;(const-exp (id expVal constBody) (list id expVal constBody))
-      (list-exp (elements) (eval-rands elements env))
+      (list-exp (elements) (list->vector (eval-rands elements env) ))
       (emptylist-exp () (list))
-      (prim-list-exp (prim lst) (eval-list-prim prim (eval-rands lst env) env))
+      (prim-list-exp (prim lst) (eval-list-prim prim (list->vector (eval-rands lst env)) env))
 
       (tuple-exp (elements) 'porimplementar)
       ;(emptytuple-exp () (values))
@@ -406,6 +409,12 @@
   (lambda (rand env)
     (eval-expression rand env)))
 
+(define (repeat-var-tags n)
+  (if (= n 0)
+      '()
+      (cons 'var (repeat-var-tags (- n 1)))))
+
+
 ;apply-primitive: <primitiva> <list-of-expression> -> numero
 
 (define apply-primitive
@@ -431,7 +440,7 @@
                            (cases environment ultimo-env
                              (empty-env-record ()
                                                '())
-                             (extended-env-record (syms vals parent-env)
+                             (extended-env-record (syms vals type-val parent-env)
                                                   (if (null? vals)
                                                       '()
                                                       (car vals))))))
@@ -765,10 +774,16 @@ eval-circuit(connected)
     (cases primitive-list prim
       (vacio?-prim-list () (null? (car args)))
       (lista?-prim-list () (list? (car args)))
-      (cabeza-prim-list () (caar args))
+      (cabeza-prim-list () (vector-ref (vector-ref args 0) 0));(caar args))
       (cola-prim-list () (cdr (car args)))
       (append-prim-list () (append-aux args))
-      (ref-list-prim () env)
+      ; set-list(<lista> <posicion> <valor-nuevo>)
+      ;(ref-list-prim () )
+      (set-list-prim ()
+                     (let ((lst (car args))
+                           (pos (cadr args))
+                           (new-value (caddr args)))
+                       (list-set lst pos new-value)))
       
       )))
 
@@ -818,7 +833,7 @@ eval-circuit(connected)
   (lambda (proc args)
     (cases procval proc
       (closure (ids body env)
-               (eval-expression body (extend-env ids args env))))))
+               (eval-expression body (extend-env ids args (list 'closure) env))))))
 
 ;*******************************************************************************************
 ;Ambientes
@@ -829,6 +844,7 @@ eval-circuit(connected)
   (extended-env-record
    (syms (list-of symbol?))
    (vec vector?)
+   (vec-types vector?)
    (env environment?)))
 
 (define scheme-value? (lambda (v) #t))
@@ -843,8 +859,8 @@ eval-circuit(connected)
 ;extend-env: <list-of symbols> <list-of numbers> enviroment -> enviroment
 ;función que crea un ambiente extendido
 (define extend-env
-  (lambda (syms vals env)
-    (extended-env-record syms (list->vector vals) env)))
+  (lambda (syms vals types-vals env)
+    (extended-env-record syms (list->vector vals) (list->vector types-vals) env)))
 
 ;extend-env-recursively: <list-of symbols> <list-of <list-of symbols>> <list-of expressions> environment -> environment
 ;función que crea un ambiente extendido para procedimientos recursivos
@@ -890,10 +906,10 @@ eval-circuit(connected)
     (cases environment env
       (empty-env-record ()
                         (eopl:error 'apply-env-ref "No binding for ~s" sym))
-      (extended-env-record (syms vals env)
+      (extended-env-record (syms vals type-val env)
                            (let ((pos (rib-find-position sym syms)))
                              (if (number? pos)
-                                 (a-ref pos vals)
+                                 (a-ref pos vals type-val)
                                  (apply-env-ref env sym)))))))
 
 
@@ -902,7 +918,8 @@ eval-circuit(connected)
 
 (define-datatype reference reference?
   (a-ref (position integer?)
-         (vec vector?)))
+         (vec vector?)
+         (vec-type? vector?)))
 
 (define deref
   (lambda (ref)
@@ -911,7 +928,7 @@ eval-circuit(connected)
 (define primitive-deref
   (lambda (ref)
     (cases reference ref
-      (a-ref (pos vec)
+      (a-ref (pos vec vec-type)
              (vector-ref vec pos)))))
 
 (define setref!
@@ -921,7 +938,7 @@ eval-circuit(connected)
 (define primitive-setref!
   (lambda (ref val)
     (cases reference ref
-      (a-ref (pos vec)
+      (a-ref (pos vec vec-type)
              (vector-set! vec pos val)))))
 
 
