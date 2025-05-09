@@ -97,7 +97,7 @@
     (expression ("var" (separated-list identifier "=" expression ",") "in" expression ";") vardecl-exp)
     (expression ("rec" (arbno identifier "(" (separated-list identifier ",") ")" "=" expression) "in" expression) 
                 letrec-exp)
-    ;(expression ("const" (separated-list identifier "=" expression ",") "in" expression) const-exp)
+    (expression ("const" (separated-list identifier "=" expression ",") "in" expression ";") const-exp)
     ;(expression ("rec" identifier "(" (arbno (separated-list identifier ","))  expression "in" expression) rec-exp)
 
     
@@ -342,7 +342,11 @@
                      (let ((tags (repeat-var-tags (length ids))))
                        (eval-expression varBody (extend-env ids args tags env)))))
 
-      ;(const-exp (id expVal constBody) (list id expVal constBody))
+      (const-exp (ids expConst constBody)
+                 (let ((args (eval-rands expConst env)))
+                   (let ((tags (repeat-const-tags (length ids))))
+                     (eval-expression constBody (extend-env ids args tags env)))))
+      
       (list-exp (elements) (list->vector (eval-rands elements env) ))
       (emptylist-exp () (list))
       (prim-list-exp (prim lst) (eval-list-prim prim (list->vector (eval-rands lst env)) env))
@@ -374,11 +378,14 @@
                   (eval-expression letrec-body
                                    (extend-env-recursively proc-names idss bodies env)))
       (set-exp (id rhs-exp)
-               (begin
-                 (setref!
-                  (apply-env-ref env id)
-                  (eval-expression rhs-exp env))
-                 1))
+               (if (verificar-ref-type (apply-env-ref env id))
+                   (begin
+                     (setref!
+                      (apply-env-ref env id)
+                      (eval-expression rhs-exp env))
+                     1)
+                   (eopl:error 'set-exp "No se puede modificar la constante: ~s" id)))
+
       (begin-exp (exp exps) 
                  (let loop ((acc (eval-expression exp env))
                             (exps exps))
@@ -413,6 +420,11 @@
   (if (= n 0)
       '()
       (cons 'var (repeat-var-tags (- n 1)))))
+
+(define (repeat-const-tags n)
+  (if (= n 0)
+      '()
+      (cons 'const (repeat-const-tags (- n 1)))))
 
 
 ;apply-primitive: <primitiva> <list-of-expression> -> numero
@@ -628,16 +640,16 @@ como true o false directamente.
 
 
 ;true-value?: determina si un valor dado corresponde a un valor booleano falso o verdadero
-(define true-value?
-  (lambda (x)
-    (not (zero? x))))
-
 ;(define true-value?
- ; (lambda (v)
-  ;  (cond
-   ;   ((= v 1) #t)
-    ;  ((= v -1) #f)
-     ; (else #t))))
+ ; (lambda (x)
+  ;  (not (zero? x))))
+
+(define true-value?
+  (lambda (v)
+    (cond
+      ((eq? v #t) #t)
+      ((eq? v #f) #f)
+      (else #t))))
 
 
 
@@ -868,7 +880,7 @@ eval-circuit(connected)
   (lambda (proc-names idss bodies old-env)
     (let ((len (length proc-names)))
       (let ((vec (make-vector len)))
-        (let ((env (extended-env-record proc-names vec old-env)))
+        (let ((env (extended-env-record proc-names vec 'closure-rec old-env)))
           (for-each
             (lambda (pos ids body)
               (vector-set! vec pos (closure ids body env)))
@@ -911,6 +923,17 @@ eval-circuit(connected)
                              (if (number? pos)
                                  (a-ref pos vals type-val)
                                  (apply-env-ref env sym)))))))
+
+
+;; Funcion auxiliar para desempaquetar una referencia, y ver qué tiene en vec-type si const o var
+(define verificar-ref-type
+  (lambda (ref)
+    (cases reference ref
+      (a-ref (pos vec vec-type)
+             (let ((type (vector-ref vec-type pos)))
+               (cond
+                 [(eq? type 'var) #t]
+                 [(eq? type 'const) #f]))))))
 
 
 ;*******************************************************************************************
@@ -1041,10 +1064,16 @@ and( <(5,3) , >(8,4) )
 
 not( <(4,3) ) -> #t
 
+ var x = 5, y = 3 in 
+if >(x,y) then 5 else 1;
+5
+
+
+var x = 5 in 
+set x = 4;
+1
 
 |#
-
-
 
 #|
 (show-the-datatypes)
