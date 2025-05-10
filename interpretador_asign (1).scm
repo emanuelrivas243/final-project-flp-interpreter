@@ -1,5 +1,5 @@
 #lang eopl
-(require racket/list)
+(require racket/vector)
 
 ;******************************************************************************************
 ;;;;; Interpretador para lenguaje con condicionales, ligadura local, procedimientos,
@@ -88,7 +88,8 @@
 (define grammar-simple-interpreter
   '((program (expression) a-program)
     (expression (numberInt) int-exp)
-    ;(expression (identifier) a-string)
+    (expression (numberFloat) float-exp)
+    ;(expression ("~" identifier (arbno identifier) "~") a-string)
     (expression ("true") true-exp)
     (expression ("false") false-exp)
     (expression (identifier) var-exp)
@@ -104,7 +105,7 @@
     ;; Constructores de Datos Predefinidos
     (expression ("lista" "(" (separated-list expression ",") ")") list-exp)
     (expression ("lista()") emptylist-exp)
-    (expression (primitive-list "(" (arbno expression) ")") prim-list-exp)
+    (expression (primitive-list "(" (separated-list expression ",") ")") prim-list-exp)
     
     (expression ("tupla" "(" (separated-list expression ",") ")") tuple-exp)
     
@@ -141,8 +142,8 @@
     (primitive-list ("cabeza") cabeza-prim-list)
     (primitive-list ("cola") cola-prim-list)
     (primitive-list ("append") append-prim-list)
-    ;(primitive-list ("ref-list") ref-list-prim)
-    (primitive-list ("set-list") set-list-prim)
+    (primitive-list ("ref-list") ref-prim-list)
+    ;(primitive-list ("set-list") set-list-prim)
     
     
     ;; 
@@ -332,7 +333,8 @@
   (lambda (exp env)
     (cases expression exp
       (int-exp (datum) datum)
-      ;(a-string (str) str)
+      (float-exp (datum) datum)
+      ;(a-string (str str2) (list->string str2))
       (true-exp () #t)
       (false-exp () #f)
       
@@ -348,7 +350,7 @@
                      (eval-expression constBody (extend-env ids args tags env)))))
       
       (list-exp (elements) (list->vector (eval-rands elements env) ))
-      (emptylist-exp () (list))
+      (emptylist-exp () (vector))
       (prim-list-exp (prim lst) (eval-list-prim prim (list->vector (eval-rands lst env)) env))
 
       (tuple-exp (elements) 'porimplementar)
@@ -425,6 +427,12 @@
   (if (= n 0)
       '()
       (cons 'const (repeat-const-tags (- n 1)))))
+
+(define unir-strings
+  (lambda str
+    (if (null? str)
+        '()
+        (cons (car str) (unir-strings (cdr str))))))
 
 
 ;apply-primitive: <primitiva> <list-of-expression> -> numero
@@ -783,21 +791,20 @@ eval-circuit(connected)
 ;; eval-list-prim
 (define eval-list-prim
   (lambda (prim args env)
-    (cases primitive-list prim
-      (vacio?-prim-list () (null? (car args)))
-      (lista?-prim-list () (list? (car args)))
-      (cabeza-prim-list () (vector-ref (vector-ref args 0) 0));(caar args))
-      (cola-prim-list () (cdr (car args)))
-      (append-prim-list () (append-aux args))
-      ; set-list(<lista> <posicion> <valor-nuevo>)
-      ;(ref-list-prim () )
-      (set-list-prim ()
-                     (let ((lst (car args))
-                           (pos (cadr args))
-                           (new-value (caddr args)))
-                       (list-set lst pos new-value)))
-      
-      )))
+    (let ((v (vector-ref args 0))) ; acceso único al argumento
+      (cases primitive-list prim
+        (vacio?-prim-list () (= (vector-length v) 0))
+        (lista?-prim-list () (vector? v))
+        (cabeza-prim-list () (vector-ref v 0))
+        (cola-prim-list () (vector-drop v 1))
+        (append-prim-list ()
+                          (let ((v2 (vector-ref args 1)))
+                            (vector-append v v2)))
+        
+        ;; ref-list(<lista><posicion>)
+        (ref-prim-list () args)
+      ))))
+
 
 ; Función auxiliar para recorrer la lista de listas y hacerles append
 (define append-aux
@@ -1072,6 +1079,10 @@ if >(x,y) then 5 else 1;
 var x = 5 in 
 set x = 4;
 1
+
+
+append(lista(1,2,3) lista(5,6))
+#(1 2 3 5 6)
 
 |#
 
