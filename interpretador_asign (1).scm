@@ -106,10 +106,11 @@
     (expression ("lista" "(" (separated-list expression ",") ")") list-exp)
     (expression ("lista()") emptylist-exp)
     (expression (primitive-list "(" (separated-list expression ",") ")") prim-list-exp)
+    (expression (primitive-tuple "(" (separated-list expression ",") ")") prim-tuple-exp)
+
     
     (expression ("tupla" "(" (separated-list expression ",") ")") tuple-exp)
-    
-    ;(expression ("tupla[]") emptytuple-exp)
+    (expression ("tupla()") emptytuple-exp)
     
     (expression
      (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
@@ -135,23 +136,29 @@
     ;; ejemplo: vacio?(lista(1,2,3)) -> #f ;|; vacio?(lista()) -> #t
     
     (primitive-list ("vacio?") vacio?-prim-list)
-    ;(primitive-list ("vacio") vacio-prim-list)
-    ;(primitive-list ("crear-lista") crear-prim-list)
-    
     (primitive-list ("lista?") lista?-prim-list)
     (primitive-list ("cabeza") cabeza-prim-list)
     (primitive-list ("cola") cola-prim-list)
     (primitive-list ("append") append-prim-list)
     (primitive-list ("ref-list") ref-prim-list)
-    ;(primitive-list ("set-list") set-list-prim)
+    (primitive-list ("set-list") set-list-prim)
+    
+    ;; Primitivas sobre tuplas
+    (primitive-tuple ("vacio-t?") vacio?-prim-tuple)
+    (primitive-tuple ("tupla?") tupla?-prim-tuple)
+    (primitive-tuple ("cabeza-t") cabeza-prim-tuple)
+    (primitive-tuple ("cola-t") cola-prim-tuple)
+    (primitive-tuple ("ref-tuple") ref-prim-tuple)
+    
     
     
     ;; 
     (expression
      (primitive "(" (separated-list expression ",")")")
      primapp-exp)
-    
-    (expression ("if" expression "then" expression "else" expression)
+
+    ; inspirado en el if-else de Java
+    (expression ("if" "(" expression ")" "{" expression "}" "else" "{" expression "}")
                 if-exp)
     
     (expression ("let" (arbno identifier "=" expression) "in" expression)
@@ -352,9 +359,10 @@
       (list-exp (elements) (list->vector (eval-rands elements env) ))
       (emptylist-exp () (vector))
       (prim-list-exp (prim lst) (eval-list-prim prim (list->vector (eval-rands lst env)) env))
-
-      (tuple-exp (elements) 'porimplementar)
-      ;(emptytuple-exp () (values))
+      (tuple-exp (elements) (eval-rands elements env))
+      (emptytuple-exp () '())
+      (prim-tuple-exp (prim tuple) (eval-tuple-prim prim (eval-rands tuple env) env ))
+      
       
       (primapp-exp (prim rands)
                    (let ((args (eval-rands rands env)))
@@ -800,10 +808,31 @@ eval-circuit(connected)
         (append-prim-list ()
                           (let ((v2 (vector-ref args 1)))
                             (vector-append v v2)))
-        
-        ;; ref-list(<lista><posicion>)
-        (ref-prim-list () args)
+        ;; ref-list(<lista> <posicion>)
+        (ref-prim-list ()
+                       (let ((pos (vector-ref args 1)))
+                         (vector-ref v pos)))
+        ;; set-list(<lista> <posicion> <valor-nuevo>)
+        (set-list-prim ()
+                       (let ((pos (vector-ref args 1))
+                             (new-value (vector-ref args 2)))
+                         (vector-set! v pos new-value)
+                         v))
       ))))
+
+(define eval-tuple-prim
+  (lambda (prim args env)
+    (let ((t (car args)))
+      (cases primitive-tuple prim
+        (vacio?-prim-tuple () (null? t))
+        (tupla?-prim-tuple () (list? t))
+        (cabeza-prim-tuple () (car t))
+        (cola-prim-tuple () (cdr t))
+        ; ref-tuple(<tupla> <posicion>)
+        (ref-prim-tuple ()
+                        (let ((pos (cadr args)))
+                          (list-ref t pos)))
+        ))))
 
 
 ; Función auxiliar para recorrer la lista de listas y hacerles append
@@ -1083,6 +1112,31 @@ set x = 4;
 
 append(lista(1,2,3) lista(5,6))
 #(1 2 3 5 6)
+
+
+--> ref-list(lista(1,2,3), 2)
+3
+--> ref-list(lista(1,2,3), 1)
+2
+--> ref-list(lista(1,2,3), 0)
+1
+
+
+var x = lista(1,2,3) in 
+begin 
+set x = set-list(x, 2, 24); 
+x 
+end;
+#(1 2 24)
+
+
+--> cabeza-t(tupla(1,2,3))
+1
+--> cola-t(tupla(1,2,3))
+(2 3)
+--> ref-tuple(tupla(1,2,3), 2)
+3
+
 
 |#
 
