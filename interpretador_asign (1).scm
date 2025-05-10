@@ -71,7 +71,7 @@
 '((white-sp
    (whitespace) skip)
   (comment
-   ("%" (arbno (not #\newline))) skip)
+   ("//" (arbno (not #\newline))) skip)
   (identifier
    (letter (arbno (or letter digit "?"))) symbol)
   (numberInt
@@ -212,6 +212,7 @@
     (primitive ("+") add-prim)
     (primitive ("-") substract-prim)
     (primitive ("*") mult-prim)
+    (primitive ("%") mod-prim)
     (primitive ("add1") incr-prim)
     (primitive ("sub1") decr-prim)
     (primitive ("eval-circuit") eval-circuit-prim)
@@ -453,6 +454,7 @@
       (mult-prim () (* (car args) (cadr args)))
       (incr-prim () (+ (car args) 1))
       (decr-prim () (- (car args) 1))
+      (mod-prim () (modulo (car args) (cadr args)))
       
       ;; Primitivas adicionales
       #|
