@@ -1,5 +1,6 @@
 #lang eopl
 (require racket/vector)
+(require racket/string)
 
 ;******************************************************************************************
 ;;;;; Interpretador para lenguaje con condicionales, ligadura local, procedimientos,
@@ -89,13 +90,14 @@
   '((program (expression) a-program)
     (expression (numberInt) int-exp)
     (expression (numberFloat) float-exp)
-    ;(expression ("~" identifier (arbno identifier) "~") a-string)
+    (expression ("'" identifier (arbno identifier) "'") a-string)
     (expression ("true") true-exp)
     (expression ("false") false-exp)
     (expression (identifier) var-exp)
 
     ;; Expresiones Definiciones
     (expression ("var" (separated-list identifier "=" expression ",") "in" expression ";") vardecl-exp)
+    ;(expression ("var;" (arbno expression)) var-empty-exp)
     (expression ("rec" (arbno identifier "(" (separated-list identifier ",") ")" "=" expression) "in" expression) 
                 letrec-exp)
     (expression ("const" (separated-list identifier "=" expression ",") "in" expression ";") const-exp)
@@ -107,10 +109,15 @@
     (expression ("lista()") emptylist-exp)
     (expression (primitive-list "(" (separated-list expression ",") ")") prim-list-exp)
     (expression (primitive-tuple "(" (separated-list expression ",") ")") prim-tuple-exp)
+    (expression (primitive-dict "(" (separated-list expression ",") ")") prim-dict-exp)
 
-    
+    ; Tuplas
     (expression ("tupla" "(" (separated-list expression ",") ")") tuple-exp)
     (expression ("tupla()") emptytuple-exp)
+
+    ;; Registros
+    (expression ("{" (separated-list identifier ":" expression ",") "}") dict-exp)
+    
     
     (expression
      (pred-prim "(" expression "," expression ")" ) comparison-prim-exp)
@@ -149,6 +156,10 @@
     (primitive-tuple ("cabeza-t") cabeza-prim-tuple)
     (primitive-tuple ("cola-t") cola-prim-tuple)
     (primitive-tuple ("ref-tuple") ref-prim-tuple)
+
+    ;; Primitivas sobre registros/diccionarios
+    (primitive-dict ("registros?") registros?-prim-dict)
+    (primitive-dict ("crear-registro") crear-registro-prim-dict)
     
     
     
@@ -342,7 +353,7 @@
     (cases expression exp
       (int-exp (datum) datum)
       (float-exp (datum) datum)
-      ;(a-string (str str2) (list->string str2))
+      (a-string (str str2) (eval-string str str2))
       (true-exp () #t)
       (false-exp () #f)
       
@@ -351,6 +362,7 @@
                    (let ((args (eval-rands expVar env)))
                      (let ((tags (repeat-var-tags (length ids))))
                        (eval-expression varBody (extend-env ids args tags env)))))
+      ;(var-empty-exp () '())
 
       (const-exp (ids expConst constBody)
                  (let ((args (eval-rands expConst env)))
@@ -363,7 +375,10 @@
       (tuple-exp (elements) (eval-rands elements env))
       (emptytuple-exp () '())
       (prim-tuple-exp (prim tuple) (eval-tuple-prim prim (eval-rands tuple env) env ))
-      
+
+      (dict-exp (ids exps) (vector (list->vector ids) (list->vector (eval-rands exps env))));(pretty-print-dict(vector ids (eval-rands exps env))))
+      (prim-dict-exp (prim dict) (eval-dict-prim prim (eval-rands dict env) env ))
+
       
       (primapp-exp (prim rands)
                    (let ((args (eval-rands rands env)))
@@ -437,11 +452,19 @@
       '()
       (cons 'const (repeat-const-tags (- n 1)))))
 
-(define unir-strings
-  (lambda str
-    (if (null? str)
-        '()
-        (cons (car str) (unir-strings (cdr str))))))
+(define pretty-print-dict
+  (lambda (dict)
+    (let* ((keys (vector-ref dict 0))
+           (values (vector-ref dict 1))
+           (pairs (map (lambda (k v)
+                         (string-append "'" (symbol->string k) "': " 
+                                        (if (string? v)
+                                            (string-append "'" v "'")
+                                            (number->string v))))
+                       keys
+                       values)))
+      (string-append "{" (string-join pairs ", ") "}"))))
+
 
 
 ;apply-primitive: <primitiva> <list-of-expression> -> numero
@@ -836,6 +859,22 @@ eval-circuit(connected)
                           (list-ref t pos)))
         ))))
 
+(define eval-dict-prim
+  (lambda (prim args env)
+    (let* ((vecs (car args)))
+      (cases primitive-dict prim
+        (registros?-prim-dict ()
+                              (if (and (vector? vecs) (= (vector-length vecs) 2))
+                                  #t
+                                  #f))
+        (crear-registro-prim-dict () prim)
+        ))))
+
+(define eval-string
+  (lambda (str str2)
+    (if (null? str2)
+        (symbol->string str)
+        (string-join (cons (symbol->string str) (map symbol->string str2)) " "))))
 
 ; Función auxiliar para recorrer la lista de listas y hacerles append
 (define append-aux
