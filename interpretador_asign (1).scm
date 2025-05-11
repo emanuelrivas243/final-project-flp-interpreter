@@ -159,7 +159,9 @@
 
     ;; Primitivas sobre registros/diccionarios
     (primitive-dict ("registros?") registros?-prim-dict)
-    (primitive-dict ("crear-registro") crear-registro-prim-dict)
+    ;(primitive-dict ("crear-registro") crear-registro-prim-dict)
+    (primitive-dict ("ref-registro") ref-registro-prim-dict)
+    (primitive-dict ("set-registro") set-registro-prim-dict)
     
     
     
@@ -867,8 +869,38 @@ eval-circuit(connected)
                               (if (and (vector? vecs) (= (vector-length vecs) 2))
                                   #t
                                   #f))
-        (crear-registro-prim-dict () prim)
+        ;(crear-registro-prim-dict () prim)
+
+        
+        ; ref-registro(<dict> <clave>)
+        (ref-registro-prim-dict ()
+                                (let ((pos (buscar-clave-posicion (car args) (cadr args))))
+                                  (vector-ref (vector-ref (car args) 1) pos)))
+        
+        ; set-registro(<dict> <key> <new-value>)
+        (set-registro-prim-dict ()
+                                (let ((dict (car args))
+                                      (key (cadr args))
+                                      (new-key-value (caddr args)))
+                                  (let ((pos (buscar-clave-posicion dict key)))
+                                    (if pos
+                                        (begin
+                                          (vector-set! (vector-ref dict 1) pos new-key-value)
+                                          dict) ; retorna el diccionario ya modificado
+                                        #f))))
+        
         ))))
+
+(define buscar-clave-posicion
+  (lambda (dict key)
+    (let* ((key-sym (string->symbol key))
+           (claves (vector-ref dict 0)))
+      (let loop ((i 0))
+        (cond
+          ((= i (vector-length claves)) #f) ; no encontrado
+          ((equal? (vector-ref claves i) key-sym) i) ; encontrado
+          (else (loop (+ i 1))))))))
+      
 
 (define eval-string
   (lambda (str str2)
