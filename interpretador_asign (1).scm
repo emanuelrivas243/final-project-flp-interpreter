@@ -139,6 +139,10 @@
     (oper-bin-bool ("or") or-op-bool)
     (oper-un-bool ("not") not-op-bool)
 
+    ;; While y For
+    (expression ("while" "(" expression ")" "do" expression "done" ) while-exp)
+    (expression ("for" identifier "in" expression "do" expression "done") for-exp)
+
     ;; Primitivas sobre listas -> Crear un eval-list para este caso, ya que es un nuevo datatype
     ;; ejemplo: vacio?(lista(1,2,3)) -> #f ;|; vacio?(lista()) -> #t
     
@@ -431,6 +435,12 @@
                       (eval-expr-bool-binop binop (list (eval-rand expr-bool1 env) (eval-rand expr-bool2 env))))
 
       (bool-uniop-exp (uniop expr-bool) (eval-expr-bool-uniop uniop (eval-rand expr-bool env)))
+
+      ;; While
+      (while-exp (cond body-exps) (eval-while-expr (list cond) body-exps env))
+
+      ;; For
+      (for-exp (id iterable for-body) (eval-for-expr id iterable for-body env))
       
       (circuit-exp (circ) (eval-circuit circ env)))))
 
@@ -941,6 +951,47 @@ eval-circuit(connected)
       (not-op-bool () (not args))
       )))
 
+; eval de while
+(define eval-while-expr
+  (lambda (cond body-exps env)
+    (let ((evaluated-cond (eval-rands cond env)))
+      (eval-rand cond env))))
+
+;;
+(define eval-for-expr
+  (lambda (id itr body-for env)
+    (let ((itr-evaluated (eval-expression itr env))) ; evalúa la colección
+      (cond
+        ;; caso para listas (aquí vectores internamente)
+        [(vector? itr-evaluated)
+         (let loop ((i 0)
+                    (vec itr-evaluated)
+                    (acc '()))
+           (if (= i (vector-length vec))
+               acc
+               (let* ((val (vector-ref vec i))
+                      (new-env (extend-env (list id) (list val) (list 'var) env))
+                      (res (eval-expression body-for new-env)))
+                 (loop (+ i 1) vec (append acc (list res))))))]
+
+        ;; caso para tuplas
+        [(list? itr-evaluated)
+         (let loop ((i 0)
+                    (lst itr-evaluated)
+                    (acc '()))
+           (if (= i (length lst))
+               acc
+               (let* ((val (list-ref lst i))
+                      (new-env (extend-env (list id) (list val) (list 'var) env))
+                      (res (eval-expression body-for new-env)))
+                 (loop (+ i 1) lst (append acc (list res))))))]
+
+        ;; otro tipo no soportado
+        [else
+         (eopl:error 'eval-for-expr
+                     "El valor ~s no es una lista ni un vector" itr-evaluated)]))))
+        
+      
 ;*******************************************************************************************
 ;Procedimientos
 (define-datatype procval procval?
@@ -1202,6 +1253,10 @@ x
 end;
 #(1 2 24)
 
+var x = 0, miLista = lista(1,2,3) in 
+begin set miLista = for x in miLista do *(x,3) done; miLista end;
+(3 6 9)
+
 
 --> cabeza-t(tupla(1,2,3))
 1
@@ -1209,6 +1264,24 @@ end;
 (2 3)
 --> ref-tuple(tupla(1,2,3), 2)
 3
+
+
+var x = 5 in 
+const b = 6 in 
+begin 
+set x = 9; 
+set b = true; 
+b 
+end 
+;;
+
+
+var i = 0 in 
+set i = while ( <(i,10)) do 
+begin 
+set i = +(i,1); i 
+end 
+done;
 
 
 |#
