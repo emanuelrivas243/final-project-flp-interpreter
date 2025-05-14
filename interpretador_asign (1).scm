@@ -13,7 +13,6 @@
 ;;  <expression>    ::= <number>
 ;;                      <lit-exp (datum)>
 ;;                  ::= <string>
-;;                  ::= 
 ;;                  ::= <identifier>
 ;;                      <var-exp (id)>
 ;;                  ::= <primitive> ({<expression>}*(,))
@@ -82,7 +81,10 @@
   (numberFloat
    (digit (arbno digit) "." digit (arbno digit)) number)
   (numberFloat
-   ("-" digit (arbno digit) "." digit (arbno digit)) number)))
+   ("-" digit (arbno digit) "." digit (arbno digit)) number)
+  (numberHex ("0x" (arbno (or digit #\a #\b #\c #\d #\e #\f 
+                            #\A #\B #\C #\D #\E #\F))) string)
+  ))
 
 ;Especificación Sintáctica (gramática)
 
@@ -90,6 +92,7 @@
   '((program (expression) a-program)
     (expression (numberInt) int-exp)
     (expression (numberFloat) float-exp)
+    (expression (numberHex) hex-exp)
     (expression ("'" identifier (arbno identifier) "'") a-string)
     (expression ("true") true-exp)
     (expression ("false") false-exp)
@@ -359,6 +362,12 @@
     (cases expression exp
       (int-exp (datum) datum)
       (float-exp (datum) datum)
+      (hex-exp (datum)
+             (let* ((clean-datum (substring datum 2))
+                    (num (string->number clean-datum 16)))
+               (if num
+                   num
+                   (eopl:error 'hex-exp "Valor hexadecimal inválido: ~s" datum))))
       (a-string (str str2) (eval-string str str2))
       (true-exp () #t)
       (false-exp () #f)
