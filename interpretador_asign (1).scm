@@ -13,6 +13,7 @@
 ;;  <expression>    ::= <number>
 ;;                      <lit-exp (datum)>
 ;;                  ::= <string>
+;;                  ::= 
 ;;                  ::= <identifier>
 ;;                      <var-exp (id)>
 ;;                  ::= <primitive> ({<expression>}*(,))
@@ -81,10 +82,7 @@
   (numberFloat
    (digit (arbno digit) "." digit (arbno digit)) number)
   (numberFloat
-   ("-" digit (arbno digit) "." digit (arbno digit)) number)
-  (numberHex ("0x" (arbno (or digit #\a #\b #\c #\d #\e #\f 
-                            #\A #\B #\C #\D #\E #\F))) string)
-  ))
+   ("-" digit (arbno digit) "." digit (arbno digit)) number)))
 
 ;Especificación Sintáctica (gramática)
 
@@ -92,7 +90,6 @@
   '((program (expression) a-program)
     (expression (numberInt) int-exp)
     (expression (numberFloat) float-exp)
-    (expression (numberHex) hex-exp)
     (expression ("'" identifier (arbno identifier) "'") a-string)
     (expression ("true") true-exp)
     (expression ("false") false-exp)
@@ -170,12 +167,22 @@
     (primitive-dict ("ref-registro") ref-registro-prim-dict)
     (primitive-dict ("set-registro") set-registro-prim-dict)
     
+    ;; === Agregado para primitivas de string ===
+    (expression (primitive-string "(" (separated-list expression ",") ")") prim-string-exp)
+    (primitive-string ("longitud") string-length-prim)
+    (primitive-string ("concatenar") string-concat-prim)
+
+    (define-datatype primitive-string primitive-string?
+     (string-length-prim)
+     (string-concat-prim))
+
+
     
-    
-    ;; 
-    (expression
-     (primitive "(" (separated-list expression ",")")")
-     primapp-exp)
+(prim-string-exp
+  (prim primitive-string?)
+  (args (list-of expression?)))
+
+
 
     ; inspirado en el if-else de Java
     (expression ("if" "(" expression ")" "{" expression "}" "else" "{" expression "}")
@@ -239,7 +246,76 @@
     (primitive ("connect-circuits") connect-circuits-prim)
     (primitive ("merge-circuits") merge-circuits-prim)))
 
+;; === Agregado para soporte de objetos ===
+(expression ("class" identifier "{" (arbno method-def) "}") class-def-exp)
+(expression ("new" identifier "(" (separated-list expression ",") ")") new-object-exp)
+(expression (identifier "." identifier "(" (separated-list expression ",") ")") method-call-exp)
+(expression (identifier "." identifier) field-access-exp)
+(expression (identifier "." identifier "=" expression) field-assign-exp)
+(method-def ("def" identifier "(" (arbno identifier) ")" expression) method-def)
 
+(define-datatype class-def class-def?
+  (a-class (name symbol?)
+           (methods (list-of method-def?))))
+
+(define-datatype object-val object-val?
+  (an-object (class-name symbol?)
+             (fields (list-of (cons symbol scheme-value?)))))
+
+(define-datatype method-def method-def?
+  (a-method (name symbol?)
+            (params (list-of symbol?))
+            (body expression?)))
+
+(class-def-exp (id methods)
+  (register-class id methods)
+  'class-defined)
+
+(new-object-exp (id args)
+  (instantiate-object id args env))
+
+(method-call-exp (obj-id method-id args)
+  (let ((obj (apply-env env obj-id)))
+    (invoke-method obj method-id (eval-rands args env))))
+
+(field-access-exp (obj-id field-id)
+  (let ((obj (apply-env env obj-id)))
+    (lookup-field obj field-id)))
+
+(field-assign-exp (obj-id field-id new-val)
+  (let ((obj (apply-env env obj-id))
+        (val (eval-expression new-val env)))
+    (set-field! obj field-id val)
+    obj))
+
+(define class-registry (make-hash))
+
+(define (register-class name methods)
+  (hash-set! class-registry name methods))
+
+(define (instantiate-object class-name args env)
+  (let ((methods (hash-ref class-registry class-name)))
+    (let ((fields (map (lambda (i) (cons i #f)) '(self)))
+          (obj (an-object class-name '())))
+      obj)))
+
+(define (invoke-method obj method-name args)
+  'method-called)
+
+(define (lookup-field obj field)
+  (cond ((object-val? obj)
+         (let ((maybe (assoc field (object-val-fields obj))))
+           (if maybe (cdr maybe) (eopl:error 'lookup-field "No such field ~s" field))))))
+
+(define (set-field! obj field val)
+  (cond ((object-val? obj)
+         (let ((fields (object-val-fields obj)))
+           (let loop ((fs fields))
+             (if (null? fs)
+                 (eopl:error 'set-field! "No such field ~s" field)
+                 (if (eq? (caar fs) field)
+                     (set-cdr! (car fs) val)
+                     (loop (cdr fs)))))))))
 
 ;Tipos de datos para la sintaxis abstracta de la gramática
 
@@ -362,12 +438,6 @@
     (cases expression exp
       (int-exp (datum) datum)
       (float-exp (datum) datum)
-      (hex-exp (datum)
-             (let* ((clean-datum (substring datum 2))
-                    (num (string->number clean-datum 16)))
-               (if num
-                   num
-                   (eopl:error 'hex-exp "Valor hexadecimal inválido: ~s" datum))))
       (a-string (str str2) (eval-string str str2))
       (true-exp () #t)
       (false-exp () #f)
@@ -378,6 +448,13 @@
                      (let ((tags (repeat-var-tags (length ids))))
                        (eval-expression varBody (extend-env ids args tags env)))))
       ;(var-empty-exp () '())
+
+      (prim-string-exp (prim args)
+        (eval-string-prim prim (eval-rands args env)))
+
+       (primapp-exp (prim rands)
+        (let ((args (eval-rands rands env)))
+          (apply-primitive prim args)))
 
       (const-exp (ids expConst constBody)
                  (let ((args (eval-rands expConst env)))
@@ -819,24 +896,6 @@ Ejemplos de uso:
 
 
 |#
-
-;; Primitivas de strings
-(define eval-string-prim
-  (lambda (prim args)
-    (cases primitive-string prim
-      (longitud-prim-str () (string-length (car args)))
-      (concatenar-prim-str () (apply string-append args)))))
-
-;; Primitiva de hexadecimal
-(define apply-primitive
-  (lambda (prim args)
-    (cases primitive prim
-      ;; ... operaciones existentes ...
-      (add-hex-prim () (number->string (+ (string->number (car args) 16)
-                                         (string->number (cadr args) 16)) 16))
-      ;; ... otras operaciones hexadecimales ...
-      )))
-
 (define (get-last-gate gl)
   (cases gate_list gl
     (empty-gate-list () (eopl:error 'get-last-gate "Empty gate list"))
@@ -846,16 +905,6 @@ Ejemplos de uso:
                        (a-gate-list (g r) #f))
                      g
                      (get-last-gate rest)))))
-
-
-(define eval-while-expr
-  (lambda (cond body-exps env)
-    (let loop ()
-      (if (true-value? (eval-expression cond env))
-          (begin
-            (eval-expression body-exps env)
-            (loop))
-          '())))) ; retorna lista vacía cuando termina
 #|
 let
 a = 1
@@ -1185,20 +1234,6 @@ eval-circuit(connected)
               (if (number? list-index-r)
                 (+ list-index-r 1)
                 #f))))))
-
-;; =====================
-;; Objetos y Clases.....
-(define-record-type class-type
-  (fields name superclass fields methods))
-
-(define-record-type object
-  (fields class fields))
-
-(define make-class
-  (lambda (name superclass fields methods)
-    (make-class-type name superclass fields methods)))
-
-;; ... [resto de implementación de objetos] ...
 
 ;******************************************************************************************
 ;Pruebas
