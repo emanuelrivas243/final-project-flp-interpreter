@@ -74,7 +74,7 @@
   (comment
    ("//" (arbno (not #\newline))) skip)
   (identifier
-   (letter (arbno (or letter digit "?"))) symbol)
+   (letter (arbno (or letter digit whitespace "?"))) symbol)
   (numberInt
    (digit (arbno digit)) number)
   (numberInt
@@ -110,6 +110,10 @@
     (expression (primitive-list "(" (separated-list expression ",") ")") prim-list-exp)
     (expression (primitive-tuple "(" (separated-list expression ",") ")") prim-tuple-exp)
     (expression (primitive-dict "(" (separated-list expression ",") ")") prim-dict-exp)
+
+     (expression
+     (primitive "(" (separated-list expression ",")")")
+     primapp-exp)
 
     ; Tuplas
     (expression ("tupla" "(" (separated-list expression ",") ")") tuple-exp)
@@ -172,15 +176,15 @@
     (primitive-string ("longitud") string-length-prim)
     (primitive-string ("concatenar") string-concat-prim)
 
-    (define-datatype primitive-string primitive-string?
-     (string-length-prim)
-     (string-concat-prim))
+    ;(define-datatype primitive-string primitive-string?
+     ;(string-length-prim)
+     ;(string-concat-prim))
 
 
     
-(prim-string-exp
-  (prim primitive-string?)
-  (args (list-of expression?)))
+;(prim-string-exp
+ ; (prim primitive-string?)
+  ;(args (list-of expression?)))
 
 
 
@@ -246,76 +250,6 @@
     (primitive ("connect-circuits") connect-circuits-prim)
     (primitive ("merge-circuits") merge-circuits-prim)))
 
-;; === Agregado para soporte de objetos ===
-(expression ("class" identifier "{" (arbno method-def) "}") class-def-exp)
-(expression ("new" identifier "(" (separated-list expression ",") ")") new-object-exp)
-(expression (identifier "." identifier "(" (separated-list expression ",") ")") method-call-exp)
-(expression (identifier "." identifier) field-access-exp)
-(expression (identifier "." identifier "=" expression) field-assign-exp)
-(method-def ("def" identifier "(" (arbno identifier) ")" expression) method-def)
-
-(define-datatype class-def class-def?
-  (a-class (name symbol?)
-           (methods (list-of method-def?))))
-
-(define-datatype object-val object-val?
-  (an-object (class-name symbol?)
-             (fields (list-of (cons symbol scheme-value?)))))
-
-(define-datatype method-def method-def?
-  (a-method (name symbol?)
-            (params (list-of symbol?))
-            (body expression?)))
-
-(class-def-exp (id methods)
-  (register-class id methods)
-  'class-defined)
-
-(new-object-exp (id args)
-  (instantiate-object id args env))
-
-(method-call-exp (obj-id method-id args)
-  (let ((obj (apply-env env obj-id)))
-    (invoke-method obj method-id (eval-rands args env))))
-
-(field-access-exp (obj-id field-id)
-  (let ((obj (apply-env env obj-id)))
-    (lookup-field obj field-id)))
-
-(field-assign-exp (obj-id field-id new-val)
-  (let ((obj (apply-env env obj-id))
-        (val (eval-expression new-val env)))
-    (set-field! obj field-id val)
-    obj))
-
-(define class-registry (make-hash))
-
-(define (register-class name methods)
-  (hash-set! class-registry name methods))
-
-(define (instantiate-object class-name args env)
-  (let ((methods (hash-ref class-registry class-name)))
-    (let ((fields (map (lambda (i) (cons i #f)) '(self)))
-          (obj (an-object class-name '())))
-      obj)))
-
-(define (invoke-method obj method-name args)
-  'method-called)
-
-(define (lookup-field obj field)
-  (cond ((object-val? obj)
-         (let ((maybe (assoc field (object-val-fields obj))))
-           (if maybe (cdr maybe) (eopl:error 'lookup-field "No such field ~s" field))))))
-
-(define (set-field! obj field val)
-  (cond ((object-val? obj)
-         (let ((fields (object-val-fields obj)))
-           (let loop ((fs fields))
-             (if (null? fs)
-                 (eopl:error 'set-field! "No such field ~s" field)
-                 (if (eq? (caar fs) field)
-                     (set-cdr! (car fs) val)
-                     (loop (cdr fs)))))))))
 
 ;Tipos de datos para la sintaxis abstracta de la gramática
 
@@ -450,12 +384,8 @@
       ;(var-empty-exp () '())
 
       (prim-string-exp (prim args)
-        (eval-string-prim prim (eval-rands args env)))
-
-       (primapp-exp (prim rands)
-        (let ((args (eval-rands rands env)))
-          (apply-primitive prim args)))
-
+        (eval-string-prim prim args env))
+      
       (const-exp (ids expConst constBody)
                  (let ((args (eval-rands expConst env)))
                    (let ((tags (repeat-const-tags (length ids))))
@@ -475,6 +405,7 @@
       (primapp-exp (prim rands)
                    (let ((args (eval-rands rands env)))
                      (apply-primitive prim args)))
+      
       (if-exp (test-exp true-exp false-exp)
               (if (true-value? (eval-expression test-exp env))
                   (eval-expression true-exp env)
@@ -1043,6 +974,15 @@ eval-circuit(connected)
     (let ((evaluated-cond (eval-rands cond env)))
       (eval-rand cond env))))
 
+(define eval-string-prim
+  (lambda (prim args env)
+    (let ((str-evaluated (eval-rands args env)))
+      (cases primitive-string prim
+        (string-length-prim () (string-length (car str-evaluated)))
+        (string-concat-prim () (string-append (car str-evaluated)
+                                              (cadr str-evaluated)))
+      ))))
+
 ;;
 (define eval-for-expr
   (lambda (id itr body-for env)
@@ -1368,6 +1308,13 @@ begin
 set i = +(i,1); i 
 end 
 done;
+
+
+concatenar('hola ', 'soy emanuel')
+-> "hola soy emanuel"
+
+longitud('hola')
+-> 4
 
 
 |#
