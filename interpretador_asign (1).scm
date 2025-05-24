@@ -100,8 +100,8 @@
     ;(expression ("var;" (arbno expression)) var-empty-exp)
     (expression ("rec" (arbno identifier "(" (separated-list identifier ",") ")" "=" expression) "in" expression) 
                 letrec-exp)
+    
     (expression ("const" (separated-list identifier "=" expression ",") "in" expression ";") const-exp)
-    ;(expression ("rec" identifier "(" (arbno (separated-list identifier ","))  expression "in" expression) rec-exp)
 
     
     ;; Constructores de Datos Predefinidos
@@ -175,17 +175,6 @@
     (expression (primitive-string "(" (separated-list expression ",") ")") prim-string-exp)
     (primitive-string ("longitud") string-length-prim)
     (primitive-string ("concatenar") string-concat-prim)
-
-    ;(define-datatype primitive-string primitive-string?
-     ;(string-length-prim)
-     ;(string-concat-prim))
-
-
-    
-;(prim-string-exp
- ; (prim primitive-string?)
-  ;(args (list-of expression?)))
-
 
 
     ; inspirado en el if-else de Java
